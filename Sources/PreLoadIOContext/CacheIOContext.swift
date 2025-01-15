@@ -85,13 +85,13 @@ public class CacheIOContext: AbstractAVIOContext {
         self.url = url
         self.saveFile = saveFile
         var tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
-        tmpURL.appendingPathComponent("videoCache")
+        tmpURL = tmpURL.appendingPathComponent("videoCache")
         if !FileManager.default.fileExists(atPath: tmpURL.path) {
             try FileManager.default.createDirectory(at: tmpURL, withIntermediateDirectories: true)
         }
         let md5 = url.path.md5()
         filePropertyURL = tmpURL.appendingPathComponent(md5 + ".plist")
-        tmpURL.appendingPathComponent(md5)
+        tmpURL = tmpURL.appendingPathComponent(md5)
         if !saveFile {
             try? FileManager.default.removeItem(at: tmpURL)
             try? FileManager.default.removeItem(at: filePropertyURL)
