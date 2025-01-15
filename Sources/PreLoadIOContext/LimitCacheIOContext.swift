@@ -1,0 +1,61 @@
+//
+//  LimitCacheIOContext.swift
+//
+//
+//  Created by kintan on 3/22/24.
+//
+
+import FFmpegKit
+import Foundation
+import KSPlayer
+import Libavformat
+
+// 有大小限制的缓存看过的内容
+public class LimitCacheIOContext: CacheIOContext {
+    private var maxFileSize: UInt64 = 1024 * 1024 * 1024
+    // maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
+    convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false, maxFileSize: UInt64) throws {
+        try self.init(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt, saveFile: saveFile)
+        self.maxFileSize = maxFileSize
+    }
+
+    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
+        try super.init(url: url, flags: flags, options: options, interrupt: interrupt, saveFile: saveFile)
+    }
+
+    override func addEntry(logicalPos: Int64, buffer: UnsafeMutablePointer<UInt8>, size: Int32) throws {
+        let entry = entryList.first(where: { logicalPos == $0.logicalPos + Int64($0.size) })
+        let physicalPos: UInt64
+        if let entry, entry.physicalPos == maxPhysicalPos, !entry.isOut(size: UInt64(size)) {
+            try add(entry: entry, buffer: buffer, size: size)
+        } else {
+            let maxSize: UInt64?
+            // 超出文件限制大小的处理
+            if let last = entryList.last, last.maxSize != nil || last.physicalPos + last.size > maxFileSize {
+                let first = entryList.removeFirst()
+                physicalPos = first.physicalPos
+                if filePos != physicalPos {
+                    try file.seek(toOffset: physicalPos)
+                }
+                // 如果一个分块太小的话，那就合并下一个分块，防止seek造成有很小的分块。
+                let firstSize = first.maxSize ?? first.size
+                if firstSize < size {
+                    let second = entryList.removeFirst()
+                    maxSize = firstSize + (second.maxSize ?? second.size)
+                } else {
+                    maxSize = firstSize
+                }
+            } else {
+                physicalPos = try file.seekToEnd()
+                maxSize = nil
+            }
+            try file.write(contentsOf: Data(bytes: buffer, count: Int(size)))
+            let entry = CacheEntry(logicalPos: logicalPos, physicalPos: physicalPos, size: UInt64(size), maxSize: maxSize)
+            entryList.append(entry)
+            entryList.sort { left, right in
+                left.logicalPos < right.logicalPos
+            }
+            save()
+        }
+    }
+}
