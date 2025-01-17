@@ -312,7 +312,7 @@ extension CacheIOContext {
             return nil
         }
         context.pointee.interrupt_callback.opaque = Unmanaged.passUnretained(self).toOpaque()
-        let pb = avio_alloc_context(av_malloc(Int(AbstractAVIOContext.bufferSize)), AbstractAVIOContext.bufferSize, 0, context) { opaque, buffer, size -> Int32 in
+        let pb = avio_alloc_context(av_malloc(Int(bufferSize)), bufferSize, 0, context) { opaque, buffer, size -> Int32 in
             guard let context = opaque?.assumingMemoryBound(to: URLContext.self), let opaque = context.pointee.interrupt_callback.opaque else {
                 return -1
             }
