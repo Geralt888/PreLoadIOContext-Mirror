@@ -19,8 +19,8 @@ public class LimitCacheIOContext: CacheIOContext {
         self.maxFileSize = maxFileSize
     }
 
-    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
-        try super.init(url: url, flags: flags, options: options, interrupt: interrupt, saveFile: saveFile)
+    required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
+        try super.init(download: download, md5: md5, saveFile: saveFile)
     }
 
     override func addEntry(logicalPos: Int64, buffer: UnsafeMutablePointer<UInt8>, size: Int32) throws {

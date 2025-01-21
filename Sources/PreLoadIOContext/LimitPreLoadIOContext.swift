@@ -32,7 +32,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
         }
         // 如果已经加载的的话，那就不在加载了,但是需要定位到那个位置，并更新urlPos
         if let pos = findURLPos() {
-            let result = ffurl_seek2(context, pos, SEEK_SET)
+            let result = download.seek(offset: pos, whence: SEEK_SET)
             KSLog("[CacheIOContext] more ffurl_seek2 \(pos)")
             if result >= 0 {
                 urlPos = result
@@ -74,7 +74,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
             newEntry = nil
         }
         let start = CACurrentMediaTime()
-        let result = ffurl_read2(context, loadMoreBuffer, size)
+        let result = download.read(buffer: loadMoreBuffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }

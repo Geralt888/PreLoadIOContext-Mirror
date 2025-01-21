@@ -11,32 +11,7 @@ import KSPlayer
 import Libavformat
 
 public class CacheIOContext: AbstractAVIOContext {
-    class CacheEntry: Codable {
-        private static let maxEntrySize = 8 * 1024 * 1024
-        let logicalPos: Int64
-        let physicalPos: UInt64
-        var size: UInt64
-        var eof: Bool = false
-        var maxSize: UInt64?
-        init(logicalPos: Int64, physicalPos: UInt64, size: UInt64, maxSize: UInt64? = nil) {
-            self.logicalPos = logicalPos
-            self.physicalPos = physicalPos
-            self.size = size
-            self.maxSize = maxSize
-        }
-
-        func isOut(size: UInt64) -> Bool {
-            if self.size > CacheIOContext.CacheEntry.maxEntrySize {
-                true
-            } else if let maxSize, self.size + size > maxSize {
-                true
-            } else {
-                false
-            }
-        }
-    }
-
-    var context: UnsafeMutablePointer<URLContext>? = nil
+    let download: DownloadProtocol
     var end = Int64(0)
     // 网络请求也就是url的位置
     var urlPos = Int64(0) {
@@ -63,7 +38,6 @@ public class CacheIOContext: AbstractAVIOContext {
     var isJudgeEOF = true
     private let filePropertyURL: URL
     private let saveFile: Bool
-    private let url: URL
     // end是不是视频的总大小。
     var eof = false {
         didSet {
@@ -77,19 +51,19 @@ public class CacheIOContext: AbstractAVIOContext {
 
     public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
         var avOptions = formatContextOptions.avOptions
-        try self.init(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt, saveFile: saveFile)
+        let download = try URLContextDownload(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt)
         av_dict_free(&avOptions)
+        try self.init(download: download, md5: url.path.md5(), saveFile: saveFile)
     }
 
-    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB, saveFile: Bool) throws {
-        self.url = url
+    public required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
         self.saveFile = saveFile
+        self.download = download
         var tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
         tmpURL = tmpURL.appendingPathComponent("videoCache")
         if !FileManager.default.fileExists(atPath: tmpURL.path) {
             try FileManager.default.createDirectory(at: tmpURL, withIntermediateDirectories: true)
         }
-        let md5 = url.path.md5()
         filePropertyURL = tmpURL.appendingPathComponent(md5 + ".plist")
         tmpURL = tmpURL.appendingPathComponent(md5)
         if !saveFile {
@@ -111,13 +85,8 @@ public class CacheIOContext: AbstractAVIOContext {
             }
         }
         super.init()
-        var interruptCB = interrupt
-        let result = ffurl_open_whitelist(&context, url.absoluteString, flags, &interruptCB, options, nil, nil, nil)
 //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
 //        ffurl_connect(context, options)
-        if result != 0, entryList.isEmpty {
-            throw NSError(errorCode: .formatOpenInput, avErrorCode: result)
-        }
     }
 
     override public func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
@@ -144,11 +113,8 @@ public class CacheIOContext: AbstractAVIOContext {
                 return result
             }
         }
-        guard let context else {
-            return swift_AVERROR_EOF
-        }
         if logicalPos != urlPos {
-            let result = ffurl_seek2(context, logicalPos, SEEK_SET)
+            let result = download.seek(offset: logicalPos, whence: SEEK_SET)
             KSLog("[CacheIOContext] read ffurl_seek2 \(logicalPos) result \(result)")
             if result < 0 {
                 return Int32(result)
@@ -162,7 +128,7 @@ public class CacheIOContext: AbstractAVIOContext {
                 size = Int32(diff)
             }
         }
-        let result = ffurl_read2(context, buffer, size)
+        let result = download.read(buffer: buffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }
@@ -190,10 +156,7 @@ public class CacheIOContext: AbstractAVIOContext {
             logicalPos = offset
             return offset
         }
-        guard let context else {
-            return -1
-        }
-        let result = ffurl_seek2(context, offset, whence)
+        let result = download.seek(offset: offset, whence: whence)
         KSLog("[CacheIOContext] seek ffurl_seek2 \(offset) result \(result)")
         if result >= 0 {
             logicalPos = result
@@ -206,14 +169,11 @@ public class CacheIOContext: AbstractAVIOContext {
         if eof {
             return end
         }
-        guard let context else {
-            return -1
-        }
-        var pos = ffurl_seek2(context, 0, AVSEEK_SIZE)
+        var pos = download.fileSize()
         KSLog("[CacheIOContext] fileSize ffurl_seek2 \(pos)")
         if pos <= 0 {
-            pos = ffurl_seek2(context, -1, SEEK_END)
-            if ffurl_seek2(context, urlPos, SEEK_SET) < 0 {
+            pos = download.seek(offset: -1, whence: SEEK_END)
+            if download.seek(offset: urlPos, whence: SEEK_SET) < 0 {
                 KSLog("[CacheIOContext] Inner protocol failed to seekback end")
             }
         }
@@ -222,16 +182,12 @@ public class CacheIOContext: AbstractAVIOContext {
             eof = true
         }
         // 为了解决ts seek的问题。 ts使用AVSEEK_FLAG_BYTE。所以需要返回文件大小，这样才能seek。
-        if pos < 0 || url.pathExtension == "ts" {
-            return end
-        } else {
-            return pos
-        }
+        return end
     }
 
     override public func close() {
         try? file.close()
-        ffurl_closep(&context)
+        download.close()
         if saveFile {
             // 为了触发eof的didSet方法，更新entry中的eof字段
             if eof {
@@ -246,10 +202,10 @@ public class CacheIOContext: AbstractAVIOContext {
 
     override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
         // url一样的话也不要进行复用。每次都要new一个新的。
-        if let subIOContext = try? Self(url: url, flags: flags, options: options, interrupt: interrupt, saveFile: saveFile) {
+        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.path.md5(), saveFile: saveFile) {
             subIOContexts.append(subIOContext)
             subIOContext.isJudgeEOF = false
-            return subIOContext.getURLContext()
+            return download.getURLContext(ioContext: self)
         } else {
             return nil
         }
@@ -307,12 +263,81 @@ public class CacheIOContext: AbstractAVIOContext {
 }
 
 extension CacheIOContext {
-    func getURLContext() -> UnsafeMutablePointer<AVIOContext>? {
+    class CacheEntry: Codable {
+        private static let maxEntrySize = 8 * 1024 * 1024
+        let logicalPos: Int64
+        let physicalPos: UInt64
+        var size: UInt64
+        var eof: Bool = false
+        var maxSize: UInt64?
+        init(logicalPos: Int64, physicalPos: UInt64, size: UInt64, maxSize: UInt64? = nil) {
+            self.logicalPos = logicalPos
+            self.physicalPos = physicalPos
+            self.size = size
+            self.maxSize = maxSize
+        }
+
+        func isOut(size: UInt64) -> Bool {
+            if self.size > CacheIOContext.CacheEntry.maxEntrySize {
+                true
+            } else if let maxSize, self.size + size > maxSize {
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
+class URLContextDownload: DownloadProtocol {
+    var context: UnsafeMutablePointer<URLContext>? = nil
+    public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
+        var avOptions = formatContextOptions.avOptions
+        try self.init(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt)
+        av_dict_free(&avOptions)
+    }
+
+    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) throws {
+        var interruptCB = interrupt
+        let result = ffurl_open_whitelist(&context, url.absoluteString, flags, &interruptCB, options, nil, nil, nil)
+        //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
+        //        ffurl_connect(context, options)
+        if result != 0 {
+            throw NSError(errorCode: .formatOpenInput, avErrorCode: result)
+        }
+    }
+
+    func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
+        guard let context else {
+            return swift_AVERROR_EOF
+        }
+        return ffurl_read2(context, buffer, size)
+    }
+
+    func seek(offset: Int64, whence: Int32) -> Int64 {
+        guard let context else {
+            return -1
+        }
+        return ffurl_seek2(context, offset, whence)
+    }
+
+    func fileSize() -> Int64 {
+        guard let context else {
+            return -1
+        }
+        return seek(offset: 0, whence: AVSEEK_SIZE)
+    }
+
+    func close() {
+        ffurl_closep(&context)
+    }
+
+    func getURLContext(ioContext: AbstractAVIOContext) -> UnsafeMutablePointer<AVIOContext>? {
         guard let context else {
             return nil
         }
-        context.pointee.interrupt_callback.opaque = Unmanaged.passUnretained(self).toOpaque()
-        let pb = avio_alloc_context(av_malloc(Int(bufferSize)), bufferSize, 0, context) { opaque, buffer, size -> Int32 in
+        context.pointee.interrupt_callback.opaque = Unmanaged.passUnretained(ioContext).toOpaque()
+        let pb = avio_alloc_context(av_malloc(Int(ioContext.bufferSize)), ioContext.bufferSize, 0, context) { opaque, buffer, size -> Int32 in
             guard let context = opaque?.assumingMemoryBound(to: URLContext.self), let opaque = context.pointee.interrupt_callback.opaque else {
                 return -1
             }

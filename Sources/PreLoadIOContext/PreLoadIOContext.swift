@@ -21,8 +21,8 @@ public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
         }
     }
 
-    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
-        try super.init(url: url, flags: flags, options: options, interrupt: interrupt, saveFile: saveFile)
+    required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
+        try super.init(download: download, md5: md5, saveFile: saveFile)
     }
 
     override public func close() {
@@ -87,7 +87,7 @@ public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
         }
         // 如果已经加载的的话，那就不在加载了,但是需要定位到那个位置，并更新urlPos
         if let pos = findURLPos() {
-            let result = ffurl_seek2(context, pos, SEEK_SET)
+            let result = download.seek(offset: pos, whence: SEEK_SET)
             KSLog("[CacheIOContext] more ffurl_seek2 \(pos)")
             if result >= 0 {
                 urlPos = result
@@ -104,7 +104,7 @@ public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
                 size = Int32(min(Int64(size), diff))
             }
         }
-        let result = ffurl_read2(context, loadMoreBuffer, size)
+        let result = download.read(buffer: loadMoreBuffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }
