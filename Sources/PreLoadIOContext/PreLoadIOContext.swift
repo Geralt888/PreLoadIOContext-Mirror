@@ -21,10 +21,6 @@ public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
         }
     }
 
-    required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
-        try super.init(download: download, md5: md5, saveFile: saveFile)
-    }
-
     override public func close() {
         if let loadMoreBuffer {
             loadMoreBuffer.deallocate()

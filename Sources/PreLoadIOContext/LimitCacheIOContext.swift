@@ -12,15 +12,15 @@ import Libavformat
 
 // 有大小限制的缓存看过的内容
 public class LimitCacheIOContext: CacheIOContext {
-    private var maxFileSize: UInt64 = 1024 * 1024 * 1024
+    private let maxFileSize: UInt64
     // maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
-    convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false, maxFileSize: UInt64) throws {
-        try self.init(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt, saveFile: saveFile)
+    public required init(download: DownloadProtocol, md5: String, saveFile: Bool, maxFileSize: UInt64) throws {
         self.maxFileSize = maxFileSize
+        try super.init(download: download, md5: md5, saveFile: saveFile)
     }
 
-    required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
-        try super.init(download: download, md5: md5, saveFile: saveFile)
+    public required convenience init(download: DownloadProtocol, md5: String, saveFile: Bool = false) throws {
+        try self.init(download: download, md5: md5, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024)
     }
 
     override func addEntry(logicalPos: Int64, buffer: UnsafeMutablePointer<UInt8>, size: Int32) throws {

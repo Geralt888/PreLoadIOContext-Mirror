@@ -13,14 +13,18 @@ import QuartzCore
 
 // 有大小限制的缓存看过的内容并加载更多的
 public class LimitPreLoadIOContext: PreLoadIOContext {
-    private var maxFileSize: UInt64 = 1024 * 1024 * 1024
+    private let maxFileSize: UInt64
     // 当缓存空间上限时，已看过要缓存的最小字节
-    private var minReadedFileSize: UInt64 = 128 * 1024 * 1024
+    private let minReadedFileSize: UInt64
     // maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
-    convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false, maxFileSize: UInt64 = 1024 * 1024 * 1024, minReadedFileSize: UInt64 = 128 * 1024 * 1024) throws {
-        try self.init(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt, saveFile: saveFile)
+    public init(download: DownloadProtocol, md5: String, saveFile: Bool = false, maxFileSize: UInt64, minReadedFileSize: UInt64) throws {
         self.maxFileSize = maxFileSize
         self.minReadedFileSize = minReadedFileSize
+        try super.init(download: download, md5: md5, saveFile: saveFile)
+    }
+
+    public required convenience init(download: DownloadProtocol, md5: String, saveFile: Bool = false) throws {
+        try self.init(download: download, md5: md5, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024, minReadedFileSize: 128 * 1024 * 1024)
     }
 
     override public func more() -> Int32 {

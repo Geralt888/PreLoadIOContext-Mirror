@@ -56,7 +56,7 @@ public class CacheIOContext: AbstractAVIOContext {
         try self.init(download: download, md5: url.path.md5(), saveFile: saveFile)
     }
 
-    public required init(download: DownloadProtocol, md5: String, saveFile: Bool) throws {
+    public required init(download: DownloadProtocol, md5: String, saveFile: Bool = false) throws {
         self.saveFile = saveFile
         self.download = download
         var tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
