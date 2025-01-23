@@ -50,9 +50,7 @@ public class CacheIOContext: AbstractAVIOContext {
     }
 
     public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
-        var avOptions = formatContextOptions.avOptions
-        let download = try URLContextDownload(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt)
-        av_dict_free(&avOptions)
+        let download = try URLContextDownload(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt)
         try self.init(download: download, md5: url.path.md5(), saveFile: saveFile)
     }
 
@@ -291,13 +289,13 @@ extension CacheIOContext {
 
 class URLContextDownload: DownloadProtocol {
     var context: UnsafeMutablePointer<URLContext>? = nil
-    public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
+    public convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
         var avOptions = formatContextOptions.avOptions
         try self.init(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt)
         av_dict_free(&avOptions)
     }
 
-    required init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) throws {
+    public init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) throws {
         var interruptCB = interrupt
         let result = ffurl_open_whitelist(&context, url.absoluteString, flags, &interruptCB, options, nil, nil, nil)
         //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
