@@ -287,7 +287,7 @@ extension CacheIOContext {
     }
 }
 
-class URLContextDownload: DownloadProtocol {
+public class URLContextDownload: DownloadProtocol {
     var context: UnsafeMutablePointer<URLContext>? = nil
     public convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
         var avOptions = formatContextOptions.avOptions
@@ -305,28 +305,28 @@ class URLContextDownload: DownloadProtocol {
         }
     }
 
-    func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
+    public func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
         guard let context else {
             return swift_AVERROR_EOF
         }
         return ffurl_read2(context, buffer, size)
     }
 
-    func seek(offset: Int64, whence: Int32) -> Int64 {
+    public func seek(offset: Int64, whence: Int32) -> Int64 {
         guard let context else {
             return -1
         }
         return ffurl_seek2(context, offset, whence)
     }
 
-    func fileSize() -> Int64 {
+    public func fileSize() -> Int64 {
         guard let context else {
             return -1
         }
         return seek(offset: 0, whence: AVSEEK_SIZE)
     }
 
-    func close() {
+    public func close() {
         ffurl_closep(&context)
     }
 
