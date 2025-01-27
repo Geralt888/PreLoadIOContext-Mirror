@@ -54,7 +54,7 @@ public class CacheIOContext: AbstractAVIOContext {
         try self.init(download: download, md5: url.path.md5(), saveFile: saveFile)
     }
 
-    public required init(download: DownloadProtocol, md5: String, saveFile: Bool = false) throws {
+    public required init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false) throws {
         self.saveFile = saveFile
         self.download = download
         var tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -82,7 +82,7 @@ public class CacheIOContext: AbstractAVIOContext {
                 }
             }
         }
-        super.init()
+        super.init(bufferSize: bufferSize)
 //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
 //        ffurl_connect(context, options)
     }
@@ -198,17 +198,6 @@ public class CacheIOContext: AbstractAVIOContext {
         }
     }
 
-    override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
-        // url一样的话也不要进行复用。每次都要new一个新的。
-        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.path.md5(), saveFile: saveFile) {
-            subIOContexts.append(subIOContext)
-            subIOContext.isJudgeEOF = false
-            return download.getURLContext(ioContext: self)
-        } else {
-            return nil
-        }
-    }
-
     func addEntry(logicalPos: Int64, buffer: UnsafeMutablePointer<UInt8>, size: Int32) throws {
         let entry = entryList.first(where: { logicalPos == $0.logicalPos + Int64($0.size) })
         if let entry, !entry.isOut(size: UInt64(size)), !isOut(entry: entry, size: UInt64(size)) {
@@ -256,6 +245,17 @@ public class CacheIOContext: AbstractAVIOContext {
         if saveFile {
             let data = try? PropertyListEncoder().encode(entryList)
             try? data?.write(to: filePropertyURL)
+        }
+    }
+
+    override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
+        // url一样的话也不要进行复用。每次都要new一个新的。
+        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.path.md5(), bufferSize: bufferSize, saveFile: saveFile) {
+            subIOContexts.append(subIOContext)
+            subIOContext.isJudgeEOF = false
+            return download.getURLContext(ioContext: self)
+        } else {
+            return nil
         }
     }
 }
