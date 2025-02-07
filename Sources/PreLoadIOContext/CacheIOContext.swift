@@ -154,12 +154,17 @@ public class CacheIOContext: AbstractAVIOContext {
             logicalPos = offset
             return offset
         }
-        let result = download.seek(offset: offset, whence: whence)
+        var result = download.seek(offset: offset, whence: whence)
         KSLog("[CacheIOContext] seek ffurl_seek2 \(offset) result \(result)")
+        if result < 0 {
+            // 第一次seek失败的话，那就在尝试一下可能就成功
+            result = download.seek(offset: offset, whence: whence)
+            KSLog("[CacheIOContext] seek ffurl_seek2 \(offset) result \(result)")
+        }
         if result >= 0 {
             logicalPos = result
             urlPos = result
-        }
+        } else {}
         return result
     }
 
