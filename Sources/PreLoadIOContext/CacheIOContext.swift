@@ -83,6 +83,10 @@ public class CacheIOContext: AbstractAVIOContext {
             }
         }
         super.init(bufferSize: bufferSize)
+        if let ioContext = download as? AbstractAVIOContext {
+            audioLanguageCodes = ioContext.audioLanguageCodes
+            subtitleLanguageCodes = ioContext.subtitleLanguageCodes
+        }
 //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
 //        ffurl_connect(context, options)
     }
