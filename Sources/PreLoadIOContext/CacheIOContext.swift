@@ -13,16 +13,16 @@ import Libavformat
 public class CacheIOContext: AbstractAVIOContext {
     let download: DownloadProtocol
     var end = Int64(0)
-    // 网络请求也就是url的位置
+    /// 网络请求也就是url的位置
     var urlPos = Int64(0) {
         didSet {
             end = max(end, urlPos)
         }
     }
 
-    // ffmpeg内部的packet的位置
-    var logicalPos = Int64(0)
-    // 缓存文件当前的位置
+    /// ffmpeg内部的packet的位置
+    private(set) var logicalPos = Int64(0)
+    /// 缓存文件当前的位置
     var filePos: UInt64 {
         (try? file.offset()) ?? 0
     }
@@ -38,7 +38,7 @@ public class CacheIOContext: AbstractAVIOContext {
     var isJudgeEOF = true
     private let filePropertyURL: URL
     private let saveFile: Bool
-    // end是不是视频的总大小。
+    /// 根据eof判断 end是不是视频的总大小。
     var eof = false {
         didSet {
             if eof {
@@ -226,7 +226,7 @@ public class CacheIOContext: AbstractAVIOContext {
         }
     }
 
-    // 判断当前的片段是否会超过下一个硬盘片段
+    /// 判断当前的片段是否会超过下一个硬盘片段
     private func isOut(entry: CacheEntry, size: UInt64) -> Bool {
         let first = entryList.first { element in
             entry.physicalPos < element.physicalPos && entry.physicalPos + entry.size + size > element.physicalPos

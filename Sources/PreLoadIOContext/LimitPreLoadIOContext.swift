@@ -11,12 +11,12 @@ import KSPlayer
 import Libavformat
 import QuartzCore
 
-// 有大小限制的缓存看过的内容并加载更多的
+/// 有大小限制的缓存看过的内容并加载更多的
 public class LimitPreLoadIOContext: PreLoadIOContext {
     private let maxFileSize: UInt64
-    // 当缓存空间上限时，已看过要缓存的最小字节
+    /// 当缓存空间上限时，已看过要缓存的最小字节
     private let minReadedFileSize: UInt64
-    // maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
+    /// maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
     public init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, maxFileSize: UInt64, minReadedFileSize: UInt64) throws {
         self.maxFileSize = maxFileSize
         self.minReadedFileSize = minReadedFileSize
@@ -65,6 +65,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
             // 超出大小限制，那就看下是否有看过的完整片段
             if entryList[0].logicalPos + Int64(entryList[0].size + minReadedFileSize) < logicalPos {
                 let entry = entryList.removeFirst()
+                KSLog("[CacheIOContext] remove first entryLogicalPos:\(entry.logicalPos), logicalPos:\(logicalPos)")
                 newEntry = CacheEntry(logicalPos: urlPos, physicalPos: entry.physicalPos, size: 0, maxSize: entry.maxSize ?? entry.size)
                 size = min(size, Int32(entry.size))
             } else if let last = entryList.last, last.logicalPos > urlPos {
@@ -72,6 +73,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
                 newEntry = CacheEntry(logicalPos: urlPos, physicalPos: entry.physicalPos, size: 0, maxSize: entry.maxSize ?? entry.size)
                 size = min(size, Int32(entry.size))
             } else {
+                KSLog("[CacheIOContext] reach maxFileSize:\(maxFileSize) first entryLogicalPos:\(entryList.first?.logicalPos) last entryLogicalPos:\(entryList.last?.logicalPos) logicalPos:\(logicalPos)")
                 return 0
             }
         } else {

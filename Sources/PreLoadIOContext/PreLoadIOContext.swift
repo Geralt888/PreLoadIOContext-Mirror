@@ -10,10 +10,10 @@ import Foundation
 import KSPlayer
 import Libavformat
 
-// 无限制的缓存看过的内容，并加载更多数据，
+/// 无限制的缓存看过的内容，并加载更多数据，
 public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
     var loadMoreBuffer: UnsafeMutablePointer<UInt8>?
-    // 这个是假的UrlPos，只是为了用来计算缓存进度。
+    /// 这个是假的UrlPos，只是为了用来计算缓存进度。
     private var fakeUrlPos = Int64(0)
     override public var urlPos: Int64 {
         didSet {

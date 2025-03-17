@@ -10,10 +10,10 @@ import Foundation
 import KSPlayer
 import Libavformat
 
-// 有大小限制的缓存看过的内容
+/// 有大小限制的缓存看过的内容
 public class LimitCacheIOContext: CacheIOContext {
     private let maxFileSize: UInt64
-    // maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
+    /// maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
     public required init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool, maxFileSize: UInt64) throws {
         self.maxFileSize = maxFileSize
         try super.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile)
