@@ -21,7 +21,7 @@ public class CacheIOContext: AbstractAVIOContext {
     }
 
     /// ffmpeg内部的packet的位置
-    private(set) var logicalPos = Int64(0)
+    public private(set) var logicalPos = Int64(0)
     /// 缓存文件当前的位置
     var filePos: UInt64 {
         (try? file.offset()) ?? 0
@@ -31,7 +31,7 @@ public class CacheIOContext: AbstractAVIOContext {
         entryList.map(\.physicalPos).max() ?? 0
     }
 
-    var entryList = [CacheEntry]()
+    public internal(set) var entryList = [CacheEntry]()
     let tmpURL: URL
     let file: FileHandle
     var subIOContexts = [CacheIOContext]()
@@ -265,33 +265,6 @@ public class CacheIOContext: AbstractAVIOContext {
             return download.getURLContext(ioContext: self)
         } else {
             return nil
-        }
-    }
-}
-
-extension CacheIOContext {
-    class CacheEntry: Codable {
-        private static let maxEntrySize = 8 * 1024 * 1024
-        let logicalPos: Int64
-        let physicalPos: UInt64
-        var size: UInt64
-        var eof: Bool = false
-        var maxSize: UInt64?
-        init(logicalPos: Int64, physicalPos: UInt64, size: UInt64, maxSize: UInt64? = nil) {
-            self.logicalPos = logicalPos
-            self.physicalPos = physicalPos
-            self.size = size
-            self.maxSize = maxSize
-        }
-
-        func isOut(size: UInt64) -> Bool {
-            if self.size > CacheIOContext.CacheEntry.maxEntrySize {
-                true
-            } else if let maxSize, self.size + size > maxSize {
-                true
-            } else {
-                false
-            }
         }
     }
 }
