@@ -37,7 +37,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
         // 如果已经加载的的话，那就不在加载了,但是需要定位到那个位置，并更新urlPos
         if let pos = findURLPos() {
             let result = download.seek(offset: pos, whence: SEEK_SET)
-            KSLog("[CacheIOContext] more ffurl_seek2 \(pos)")
+            KSLog("[CacheIOContext] more ffurl_seek2 \(pos) result: \(result)")
             if result >= 0 {
                 urlPos = result
             }

@@ -155,6 +155,7 @@ public class CacheIOContext: AbstractAVIOContext {
             offset += end
         }
         if whence == SEEK_SET, offset >= 0, entryList.first(where: { offset >= $0.logicalPos && offset < $0.logicalPos + Int64($0.size) }) != nil {
+            KSLog("[CacheIOContext] seek logicalPos:\(logicalPos) updateTo:\(offset)")
             logicalPos = offset
             return offset
         }
