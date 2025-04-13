@@ -10,7 +10,11 @@ import Foundation
 import KSPlayer
 import Libavformat
 
-public class CacheIOContext: AbstractAVIOContext {
+public class CacheIOContext: AbstractAVIOContext, PlayList {
+    public private(set) var audioLanguageCodeMap = [Int32: String]()
+    public private(set) var subtitleLanguageCodeMap = [Int32: String]()
+    public private(set) var playlists = [MovieStream]()
+    public private(set) var currentStream: MovieStream? = nil
     let download: DownloadProtocol
     var end = Int64(0)
     /// 网络请求也就是url的位置
@@ -83,9 +87,10 @@ public class CacheIOContext: AbstractAVIOContext {
             }
         }
         super.init(bufferSize: bufferSize)
-        if let ioContext = download as? AbstractAVIOContext {
+        if let ioContext = download as? PlayList {
             audioLanguageCodeMap = ioContext.audioLanguageCodeMap
             subtitleLanguageCodeMap = ioContext.subtitleLanguageCodeMap
+            playlists = ioContext.playlists
         }
 //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
 //        ffurl_connect(context, options)
