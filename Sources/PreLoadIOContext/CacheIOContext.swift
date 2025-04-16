@@ -51,7 +51,7 @@ public class CacheIOContext: AbstractAVIOContext {
 
     public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
         let download = try URLContextDownload(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt)
-        try self.init(download: download, md5: url.path.md5(), saveFile: saveFile)
+        try self.init(download: download, md5: url.sortQueryString.md5(), saveFile: saveFile)
     }
 
     public required init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false) throws {
@@ -256,7 +256,7 @@ public class CacheIOContext: AbstractAVIOContext {
 
     override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
         // url一样的话也不要进行复用。每次都要new一个新的。
-        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.path.md5(), bufferSize: bufferSize, saveFile: saveFile) {
+        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.sortQueryString.md5(), bufferSize: bufferSize, saveFile: saveFile) {
             subIOContexts.append(subIOContext)
             subIOContext.isJudgeEOF = false
             return download.getURLContext(ioContext: self)
@@ -357,5 +357,20 @@ public class URLContextDownload: DownloadProtocol {
             return value.seek(offset: offset, whence: whence)
         }
         return pb
+    }
+}
+
+public extension URL {
+    /// 返回一个具有规范化参数顺序的新 URL 字符串
+    var sortQueryString: String {
+        guard let components = URLComponents(url: self, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems
+        else {
+            return absoluteString
+        }
+        let sortedQuery = queryItems.sorted { $0.name < $1.name }
+        var normalizedComponents = components
+        normalizedComponents.queryItems = sortedQuery
+        return normalizedComponents.url?.absoluteString ?? absoluteString
     }
 }
