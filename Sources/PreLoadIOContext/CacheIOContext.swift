@@ -13,7 +13,7 @@ import Libavformat
 public class CacheIOContext: AbstractAVIOContext {
     let download: DownloadProtocol
     var end = Int64(0)
-    /// 网络请求也就是url的位置
+    /// 当前网络请求的位置
     var urlPos = Int64(0) {
         didSet {
             end = max(end, urlPos)
@@ -22,7 +22,7 @@ public class CacheIOContext: AbstractAVIOContext {
 
     /// ffmpeg内部的packet的位置
     public private(set) var logicalPos = Int64(0)
-    /// 缓存文件当前的位置
+    /// 硬盘缓存文件当前的位置
     var filePos: UInt64 {
         (try? file.offset()) ?? 0
     }
@@ -113,7 +113,7 @@ public class CacheIOContext: AbstractAVIOContext {
         }
         if logicalPos != urlPos {
             let result = download.seek(offset: logicalPos, whence: SEEK_SET)
-            KSLog("[CacheIOContext] read ffurl_seek2 \(logicalPos) result \(result)")
+            KSLog("[CacheIOContext] urlPos \(urlPos) ffurl_seek2 \(logicalPos) result \(result)")
             if result < 0 {
                 return Int32(result)
             }
@@ -121,7 +121,7 @@ public class CacheIOContext: AbstractAVIOContext {
         }
         var size = size
         if let entry = entryList.first(where: { logicalPos < $0.logicalPos }) {
-            let diff = entry.logicalPos - urlPos
+            let diff = entry.logicalPos - logicalPos
             if diff > 0, diff < size {
                 size = Int32(diff)
             }
@@ -131,7 +131,7 @@ public class CacheIOContext: AbstractAVIOContext {
             eof = true
         }
         if result <= 0 {
-            KSLog("[CacheIOContext] read ffurl_read2 fail code:\(result) message: \(String(avErrorCode: result)) urlPos: \(urlPos)")
+            KSLog("[CacheIOContext] ffurl_read2 fail code:\(result) message: \(String(avErrorCode: result)) urlPos: \(urlPos)")
             return result
         }
         urlPos += Int64(result)
@@ -151,16 +151,16 @@ public class CacheIOContext: AbstractAVIOContext {
             offset += end
         }
         if whence == SEEK_SET, offset >= 0, entryList.first(where: { offset >= $0.logicalPos && offset < $0.logicalPos + Int64($0.size) }) != nil {
-            KSLog("[CacheIOContext] seek logicalPos:\(logicalPos) updateTo:\(offset)")
+            KSLog("[CacheIOContext] logicalPos:\(logicalPos) updateTo:\(offset)")
             logicalPos = offset
             return offset
         }
         var result = download.seek(offset: offset, whence: whence)
-        KSLog("[CacheIOContext] seek ffurl_seek2 \(offset) result \(result)")
+        KSLog("[CacheIOContext] ffurl_seek2 \(offset) result \(result)")
         if result < 0 {
             // 第一次seek失败的话，那就在尝试一下可能就成功
             result = download.seek(offset: offset, whence: whence)
-            KSLog("[CacheIOContext] seek ffurl_seek2 \(offset) result \(result)")
+            KSLog("[CacheIOContext] ffurl_seek2 \(offset) result \(result)")
         }
         if result >= 0 {
             logicalPos = result
@@ -174,16 +174,20 @@ public class CacheIOContext: AbstractAVIOContext {
             return end
         }
         var pos = download.fileSize()
-        KSLog("[CacheIOContext] fileSize ffurl_seek2 \(pos)")
+        KSLog("[CacheIOContext] ffurl_seek2 \(pos)")
         if pos <= 0 {
             pos = download.seek(offset: -1, whence: SEEK_END)
-            if download.seek(offset: urlPos, whence: SEEK_SET) < 0 {
+            if pos < 0 {
                 KSLog("[CacheIOContext] Inner protocol failed to seekback end")
             }
         }
         end = max(end, pos)
-        if pos > 0, isJudgeEOF {
-            eof = true
+        if pos > 0 {
+            logicalPos = pos
+            urlPos = pos
+            if isJudgeEOF {
+                eof = true
+            }
         }
         // 为了解决ts seek的问题。 ts使用AVSEEK_FLAG_BYTE。所以需要返回文件大小，这样才能seek。
         return end
