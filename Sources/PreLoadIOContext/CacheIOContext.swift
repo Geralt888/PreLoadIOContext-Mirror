@@ -183,10 +183,13 @@ public class CacheIOContext: AbstractAVIOContext {
         }
         end = max(end, pos)
         if pos > 0 {
-            logicalPos = pos
-            urlPos = pos
+            // 这里不能设置logicalPos和urlPos 不然smb播放就会有问题
             if isJudgeEOF {
                 eof = true
+                /// 有的直播回放ts流,在一开始播放的时候，会重复播放前面10s。
+                /// 看了下好像是因为在得到文件总大小之前缓存的数据是有问题的。
+                /// 所以这边先把之前的数据给清空了。
+                entryList.removeAll()
             }
         }
         // 为了解决ts seek的问题。 ts使用AVSEEK_FLAG_BYTE。所以需要返回文件大小，这样才能seek。
