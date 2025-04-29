@@ -305,7 +305,7 @@ public class URLContextDownload: DownloadProtocol {
         //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
         //        ffurl_connect(context, options)
         if result != 0 {
-            throw NSError(errorCode: .formatOpenInput, avErrorCode: result)
+            throw KSPlayerError(errorCode: .formatOpenInput, avErrorCode: result)
         }
     }
 
