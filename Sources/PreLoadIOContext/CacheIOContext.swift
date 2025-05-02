@@ -126,6 +126,8 @@ public class CacheIOContext: AbstractAVIOContext {
                 size = Int32(diff)
             }
         }
+        // 需要限制下大小。不然size会一直增加的，变得很大
+        size = min(size, bufferSize)
         let result = download.read(buffer: buffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
@@ -335,7 +337,8 @@ public class URLContextDownload: DownloadProtocol {
         guard let context else {
             return swift_AVERROR_EOF
         }
-        return ffurl_read2(context, buffer, size)
+        // ffurl_read2 返回的数据可能会很少，有的只有8KB。改成ffurl_read_complete才能返回想要的长度。
+        return ffurl_read_complete(context, buffer, size)
     }
 
     public func seek(offset: Int64, whence: Int32) -> Int64 {
