@@ -150,13 +150,34 @@ public class CacheIOContext: AbstractAVIOContext {
             whence = SEEK_SET
             offset += end
         }
-        if whence == SEEK_SET, offset >= 0, entryList.first(where: { offset >= $0.logicalPos && offset < $0.logicalPos + Int64($0.size) }) != nil {
+        if whence == SEEK_SET, offset >= 0, entryList.first(where: { offset >= $0.logicalPos && offset <= $0.logicalPos + Int64($0.size) }) != nil {
             KSLog("[CacheIOContext] logicalPos:\(logicalPos) updateTo:\(offset)")
             logicalPos = offset
             return offset
         }
+        var diff = offset - urlPos
+        // 如果可以read的话，那就不要seek了。因为seek的耗时会更久。
+        if whence == SEEK_SET, diff > 0, diff < bufferSize {
+            var buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(diff))
+            var logicalPos = urlPos
+            repeat {
+                let result = download.read(buffer: buffer, size: Int32(diff))
+                if result <= 0 {
+                    break
+                }
+                diff -= Int64(result)
+                urlPos += Int64(result)
+                try? addEntry(logicalPos: logicalPos, buffer: buffer, size: result)
+                logicalPos += Int64(result)
+            } while diff > 0
+            if logicalPos == offset {
+                self.logicalPos = logicalPos
+                KSLog("[CacheIOContext] read to \(offset)")
+                return offset
+            }
+        }
         var result = download.seek(offset: offset, whence: whence)
-        KSLog("[CacheIOContext] ffurl_seek2 \(offset) result \(result)")
+        KSLog("[CacheIOContext] urlPos \(offset) ffurl_seek2 \(offset) result \(result)")
         if result < 0 {
             // 第一次seek失败的话，那就在尝试一下可能就成功
             result = download.seek(offset: offset, whence: whence)
