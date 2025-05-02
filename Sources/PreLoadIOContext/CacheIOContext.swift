@@ -151,7 +151,7 @@ public class CacheIOContext: AbstractAVIOContext {
             offset += end
         }
         if whence == SEEK_SET, offset >= 0, entryList.first(where: { offset >= $0.logicalPos && offset <= $0.logicalPos + Int64($0.size) }) != nil {
-            KSLog("[CacheIOContext] logicalPos:\(logicalPos) updateTo:\(offset)")
+            KSLog("[CacheIOContext] urlPos \(urlPos) logicalPos:\(logicalPos) updateTo:\(offset)")
             logicalPos = offset
             return offset
         }
@@ -170,6 +170,7 @@ public class CacheIOContext: AbstractAVIOContext {
                 try? addEntry(logicalPos: logicalPos, buffer: buffer, size: result)
                 logicalPos += Int64(result)
             } while diff > 0
+            buffer.deallocate()
             if logicalPos == offset {
                 self.logicalPos = logicalPos
                 KSLog("[CacheIOContext] read to \(offset)")
@@ -177,11 +178,11 @@ public class CacheIOContext: AbstractAVIOContext {
             }
         }
         var result = download.seek(offset: offset, whence: whence)
-        KSLog("[CacheIOContext] urlPos \(offset) ffurl_seek2 \(offset) result \(result)")
+        KSLog("[CacheIOContext] urlPos \(urlPos) ffurl_seek2 \(offset) result \(result)")
         if result < 0 {
             // 第一次seek失败的话，那就在尝试一下可能就成功
             result = download.seek(offset: offset, whence: whence)
-            KSLog("[CacheIOContext] ffurl_seek2 \(offset) result \(result)")
+            KSLog("[CacheIOContext] urlPos \(urlPos) ffurl_seek2 \(offset) result \(result)")
         }
         if result >= 0 {
             logicalPos = result
