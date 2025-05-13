@@ -317,6 +317,7 @@ extension CacheIOContext: PlayList {
 
 public class URLContextDownload: DownloadProtocol {
     var context: UnsafeMutablePointer<URLContext>? = nil
+    private let keepAlive: Bool
     public convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
         var avOptions = formatContextOptions.avOptions
         try self.init(url: url, flags: AVIO_FLAG_READ, options: &avOptions, interrupt: interrupt)
@@ -325,7 +326,13 @@ public class URLContextDownload: DownloadProtocol {
 
     public init(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) throws {
         var interruptCB = interrupt
+        if let value = av_dict_get(options?.pointee, "multiple_requests", nil, 0), String(cString: value.pointee.value) == "1" {
+            keepAlive = true
+        } else {
+            keepAlive = false
+        }
         let result = ffurl_open_whitelist(&context, url.absoluteString, flags, &interruptCB, options, nil, nil, nil)
+
         //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
         //        ffurl_connect(context, options)
         if result != 0 {
@@ -338,7 +345,12 @@ public class URLContextDownload: DownloadProtocol {
             return swift_AVERROR_EOF
         }
         // ffurl_read2 返回的数据可能会很少，有的只有8KB。改成ffurl_read_complete才能返回想要的长度。
-        return ffurl_read_complete(context, buffer, size)
+        if keepAlive {
+            // 有的视频开启multiple_requests的话，用ffurl_read_complete就会失败。所以这边进行下判断
+            return ffurl_read2(context, buffer, size)
+        } else {
+            return ffurl_read_complete(context, buffer, size)
+        }
     }
 
     public func seek(offset: Int64, whence: Int32) -> Int64 {
