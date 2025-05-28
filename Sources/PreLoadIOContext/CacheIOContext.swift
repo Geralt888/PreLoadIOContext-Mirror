@@ -128,7 +128,7 @@ public class CacheIOContext: AbstractAVIOContext {
         }
         // 需要限制下大小。不然size会一直增加的，变得很大
         size = min(size, bufferSize)
-        let result = download.read(buffer: buffer, size: size)
+        let result = readComplete(buffer: buffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }
@@ -140,6 +140,30 @@ public class CacheIOContext: AbstractAVIOContext {
         try? addEntry(logicalPos: logicalPos, buffer: buffer, size: result)
         logicalPos += Int64(result)
         return result
+    }
+
+    /// 有的视频开启multiple_requests的话，用ffurl_read_complete启动播放就会失败报错-5，所以自己实现readComplete的逻辑
+    private func readComplete(buffer: UnsafeMutablePointer<UInt8>, size: Int32) -> Int32 {
+        var diff = size
+        var buffer = buffer
+        repeat {
+            let result = download.read(buffer: buffer, size: Int32(diff))
+            if result <= 0 {
+                // 如果第一次请求就报错的话，那就直接返回错误
+                if diff == size {
+                    return result
+                }
+                break
+            }
+            diff -= result
+            buffer = buffer.advanced(by: Int(result))
+            // 如果返回的数据太少的话(测试的视频是152)，就不要在继续请求的，不然就会报错-5了。
+            // 而且这个是avformat_open_input的时候才会
+            if result < 200 {
+                break
+            }
+        } while diff > 0
+        return size - diff
     }
 
     override public func seek(offset: Int64, whence: Int32) -> Int64 {
@@ -344,13 +368,7 @@ public class URLContextDownload: DownloadProtocol {
         guard let context else {
             return swift_AVERROR_EOF
         }
-        // ffurl_read2 返回的数据可能会很少，有的只有8KB。改成ffurl_read_complete才能返回想要的长度。
-        if keepAlive {
-            // 有的视频开启multiple_requests的话，用ffurl_read_complete就会失败。所以这边进行下判断
-            return ffurl_read2(context, buffer, size)
-        } else {
-            return ffurl_read_complete(context, buffer, size)
-        }
+        return ffurl_read2(context, buffer, size)
     }
 
     public func seek(offset: Int64, whence: Int32) -> Int64 {
