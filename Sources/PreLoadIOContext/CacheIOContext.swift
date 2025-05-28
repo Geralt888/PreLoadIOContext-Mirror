@@ -148,6 +148,7 @@ public class CacheIOContext: AbstractAVIOContext {
         var buffer = buffer
         repeat {
             let result = download.read(buffer: buffer, size: Int32(diff))
+//            print("result:\(result) eof:\(eof) end:\(end) urlPos:\(urlPos)")
             if result <= 0 {
                 // 如果第一次请求就报错的话，那就直接返回错误
                 if diff == size {
@@ -157,15 +158,8 @@ public class CacheIOContext: AbstractAVIOContext {
             }
             diff -= result
             buffer = buffer.advanced(by: Int(result))
-            /// 如果返回的数据够多的话，那就不继续请求了。
-            /// 有遇到一个视频每次都是返回4096，导致播放很卡。
-            /// 有遇到一个视频，请求返回4640还继续请求的话，那就会报错。
-            if result > 4 * 1024 {
-                break
-            }
-            // 如果返回的数据太少的话(测试的视频是704)，就不要在继续请求的，不然就会报错-5了。
-            // 而且这个是avformat_open_input的时候才会
-            if result <= 1024 {
+            // 如果到达end在请求的话，就会报错-541478725(EOF),然后重试就会一直报错-5。所以不能继续请求了
+            if eof, urlPos + Int64(size - diff) >= end {
                 break
             }
         } while diff > 0
