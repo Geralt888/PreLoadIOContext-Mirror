@@ -159,8 +159,8 @@ public class CacheIOContext: AbstractAVIOContext {
             buffer = buffer.advanced(by: Int(result))
             /// 如果返回的数据够多的话，那就不继续请求了。
             /// 有遇到一个视频每次都是返回4096，导致播放很卡。
-            /// 有遇到一个视频，请求返回6222还继续请求的话，那就会报错。
-            if result > 6 * 1024 {
+            /// 有遇到一个视频，请求返回4640还继续请求的话，那就会报错。
+            if result > 4 * 1024 {
                 break
             }
             // 如果返回的数据太少的话(测试的视频是704)，就不要在继续请求的，不然就会报错-5了。
