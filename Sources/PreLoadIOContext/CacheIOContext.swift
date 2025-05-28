@@ -163,9 +163,9 @@ public class CacheIOContext: AbstractAVIOContext {
             if result > 6 * 1024 {
                 break
             }
-            // 如果返回的数据太少的话(测试的视频是152)，就不要在继续请求的，不然就会报错-5了。
+            // 如果返回的数据太少的话(测试的视频是704)，就不要在继续请求的，不然就会报错-5了。
             // 而且这个是avformat_open_input的时候才会
-            if result <= 200 {
+            if result <= 1024 {
                 break
             }
         } while diff > 0
