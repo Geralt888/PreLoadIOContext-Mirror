@@ -49,7 +49,7 @@ public class LimitCacheIOContext: CacheIOContext {
                 physicalPos = try file.seekToEnd()
                 maxSize = nil
             }
-            try file.write(contentsOf: Data(bytes: buffer, count: Int(size)))
+            try file.write(contentsOf: Data(bytesNoCopy: buffer, count: Int(size), deallocator: .none))
             let entry = CacheEntry(logicalPos: logicalPos, physicalPos: physicalPos, size: UInt64(size), maxSize: maxSize)
             entryList.append(entry)
             entryList.sort { left, right in

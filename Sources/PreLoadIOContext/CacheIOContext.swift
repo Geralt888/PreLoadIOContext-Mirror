@@ -33,6 +33,7 @@ public class CacheIOContext: AbstractAVIOContext {
 
     public internal(set) var entryList = [CacheEntry]()
     let tmpURL: URL
+    // 用FileDescriptor的话，write的性能差不多，但是read会更差，所以还是用FileHandle。
     let file: FileHandle
     var subIOContexts = [CacheIOContext]()
     var isJudgeEOF = true
@@ -227,6 +228,7 @@ public class CacheIOContext: AbstractAVIOContext {
         if pos <= 0 {
             pos = download.seek(offset: -1, whence: SEEK_END)
             if pos < 0 {
+                // 代表视频无法获取大小，大概率是直播。不能设置eof为true，不然就不会继续read了。
                 KSLog("[CacheIOContext] Inner protocol failed to seekback end")
             }
         }
@@ -269,7 +271,7 @@ public class CacheIOContext: AbstractAVIOContext {
                 entry.maxSize = entry.size
             }
             let physicalPos = try file.seekToEnd()
-            try file.write(contentsOf: Data(bytes: buffer, count: Int(size)))
+            try file.write(contentsOf: Data(bytesNoCopy: buffer, count: Int(size), deallocator: .none))
             let entry = CacheEntry(logicalPos: logicalPos, physicalPos: physicalPos, size: UInt64(size))
             entryList.append(entry)
             entryList.sort { left, right in
@@ -299,7 +301,7 @@ public class CacheIOContext: AbstractAVIOContext {
         if filePos != physicalPos {
             try file.seek(toOffset: physicalPos)
         }
-        try file.write(contentsOf: Data(bytes: buffer, count: Int(size)))
+        try file.write(contentsOf: Data(bytesNoCopy: buffer, count: Int(size), deallocator: .none))
         entry.size += UInt64(size)
     }
 
