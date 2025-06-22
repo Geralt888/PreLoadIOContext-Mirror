@@ -100,7 +100,7 @@ public class PreLoadIOContext: CacheIOContext, PreLoadProtocol {
                 size = Int32(min(Int64(size), diff))
             }
         }
-        let result = download.read(buffer: loadMoreBuffer, size: size)
+        let result = readComplete(buffer: loadMoreBuffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }

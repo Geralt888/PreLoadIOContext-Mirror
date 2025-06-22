@@ -80,7 +80,7 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
             newEntry = nil
         }
         let start = CACurrentMediaTime()
-        let result = download.read(buffer: loadMoreBuffer, size: size)
+        let result = readComplete(buffer: loadMoreBuffer, size: size)
         if result == swift_AVERROR_EOF, size > 0, isJudgeEOF {
             eof = true
         }

@@ -144,7 +144,7 @@ public class CacheIOContext: AbstractAVIOContext {
     }
 
     /// 有的视频开启multiple_requests的话，用ffurl_read_complete启动播放就会失败报错-5，所以自己实现readComplete的逻辑
-    private func readComplete(buffer: UnsafeMutablePointer<UInt8>, size: Int32) -> Int32 {
+    func readComplete(buffer: UnsafeMutablePointer<UInt8>, size: Int32) -> Int32 {
         var diff = size
         var buffer = buffer
         repeat {
