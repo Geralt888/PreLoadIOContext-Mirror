@@ -219,10 +219,13 @@ public class CacheIOContext: AbstractAVIOContext {
         return result
     }
 
+    private var isFirstFileSize = true
     override public func fileSize() -> Int64 {
-        if eof {
+        guard isFirstFileSize else {
+            // 为了解决ts seek的问题。 ts使用AVSEEK_FLAG_BYTE。所以需要返回文件大小，这样才能seek。
             return end
         }
+        isFirstFileSize = false
         var pos = download.fileSize()
         KSLog("[CacheIOContext] ffurl_seek2 \(pos)")
         if pos <= 0 {
@@ -243,8 +246,8 @@ public class CacheIOContext: AbstractAVIOContext {
                 entryList.removeAll()
             }
         }
-        // 为了解决ts seek的问题。 ts使用AVSEEK_FLAG_BYTE。所以需要返回文件大小，这样才能seek。
-        return end
+        // ogg直播流第一次需要返回-1才可以进行播放。
+        return pos
     }
 
     override public func close() {
