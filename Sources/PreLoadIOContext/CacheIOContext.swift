@@ -146,6 +146,8 @@ public class CacheIOContext: AbstractAVIOContext {
         return result
     }
 
+    /// ffurl_read2返回的数据可能会很少，有的只有8KB。
+    /// 改成ffurl_read_complete才能返回想要的长度。可以解决因为音频和视频位置不在一起，频繁卡顿的问题。
     /// 有的视频开启multiple_requests的话，用ffurl_read_complete启动播放就会失败报错-5，所以自己实现readComplete的逻辑
     func readComplete(buffer: UnsafeMutablePointer<UInt8>, size: Int32) -> Int32 {
         guard isReadComplete else {
