@@ -10,6 +10,7 @@ import Foundation
 import KSPlayer
 import Libavformat
 
+/// 无大小限制的缓存看过的内容
 public class CacheIOContext: AbstractAVIOContext {
     let download: DownloadProtocol
     var end = Int64(0)
@@ -39,6 +40,7 @@ public class CacheIOContext: AbstractAVIOContext {
     var isJudgeEOF = true
     private let filePropertyURL: URL
     private let saveFile: Bool
+    private let isReadComplete: Bool
     /// 根据eof判断 end是不是视频的总大小。
     var eof = false {
         didSet {
@@ -50,14 +52,15 @@ public class CacheIOContext: AbstractAVIOContext {
         }
     }
 
-    public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false) throws {
+    public required convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB, saveFile: Bool = false, isReadComplete: Bool = true) throws {
         let download = try URLContextDownload(url: url, formatContextOptions: formatContextOptions, interrupt: interrupt)
-        try self.init(download: download, md5: url.sortQueryString.md5(), saveFile: saveFile)
+        try self.init(download: download, md5: url.sortQueryString.md5(), saveFile: saveFile, isReadComplete: isReadComplete)
     }
 
-    public required init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false) throws {
+    public required init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, isReadComplete: Bool = true) throws {
         self.saveFile = saveFile
         self.download = download
+        self.isReadComplete = isReadComplete
         var tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
         tmpURL = tmpURL.appendingPathComponent("videoCache")
         if !FileManager.default.fileExists(atPath: tmpURL.path) {
@@ -145,6 +148,9 @@ public class CacheIOContext: AbstractAVIOContext {
 
     /// 有的视频开启multiple_requests的话，用ffurl_read_complete启动播放就会失败报错-5，所以自己实现readComplete的逻辑
     func readComplete(buffer: UnsafeMutablePointer<UInt8>, size: Int32) -> Int32 {
+        guard isReadComplete else {
+            return download.read(buffer: buffer, size: size)
+        }
         var diff = size
         var buffer = buffer
         repeat {

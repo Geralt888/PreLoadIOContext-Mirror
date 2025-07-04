@@ -17,14 +17,14 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
     /// 当缓存空间上限时，已看过要缓存的最小字节
     private let minReadedFileSize: UInt64
     /// maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
-    public init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, maxFileSize: UInt64, minReadedFileSize: UInt64) throws {
+    public init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, maxFileSize: UInt64, minReadedFileSize: UInt64, isReadComplete: Bool = true) throws {
         self.maxFileSize = maxFileSize
         self.minReadedFileSize = minReadedFileSize
-        try super.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile)
+        try super.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, isReadComplete: isReadComplete)
     }
 
-    public required convenience init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false) throws {
-        try self.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024, minReadedFileSize: 128 * 1024 * 1024)
+    public required convenience init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, isReadComplete: Bool = true) throws {
+        try self.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024, minReadedFileSize: 128 * 1024 * 1024, isReadComplete: isReadComplete)
     }
 
     override public func more() -> Int32 {
