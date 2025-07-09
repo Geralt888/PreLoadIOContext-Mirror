@@ -13,18 +13,18 @@ import QuartzCore
 
 /// 有大小限制的缓存看过的内容并加载更多的
 public class LimitPreLoadIOContext: PreLoadIOContext {
+    /// 预加载的最大硬盘缓存大小，只算未观看的部分。 maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
     private let maxFileSize: UInt64
-    /// 当缓存空间上限时，已看过要缓存的最小字节
-    private let minReadedFileSize: UInt64
-    /// maxFileSize 不要太小。不然就会缓存失效。特别是高码率的视频。
-    public init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, maxFileSize: UInt64, minReadedFileSize: UInt64, isReadComplete: Bool = true) throws {
+    /// 已看过部分的最大硬盘缓存大小
+    private let maxReadedFileSize: UInt64
+    public init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, maxFileSize: UInt64, maxReadedFileSize: UInt64, isReadComplete: Bool = true) throws {
         self.maxFileSize = maxFileSize
-        self.minReadedFileSize = minReadedFileSize
+        self.maxReadedFileSize = maxReadedFileSize
         try super.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, isReadComplete: isReadComplete)
     }
 
     public required convenience init(download: DownloadProtocol, md5: String, bufferSize: Int32 = 256 * 1024, saveFile: Bool = false, isReadComplete: Bool = true) throws {
-        try self.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024, minReadedFileSize: 128 * 1024 * 1024, isReadComplete: isReadComplete)
+        try self.init(download: download, md5: md5, bufferSize: bufferSize, saveFile: saveFile, maxFileSize: 1024 * 1024 * 1024, maxReadedFileSize: 128 * 1024 * 1024, isReadComplete: isReadComplete)
     }
 
     override public func more() -> Int32 {
@@ -61,14 +61,12 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
                 size = min(size, Int32(maxSize - entry.size))
             }
             newEntry = nil
-        } else if entryList.map(\.size).reduce(0, +) > maxFileSize {
-            // 超出大小限制，那就看下是否有看过的完整片段
-            if entryList[0].logicalPos + Int64(entryList[0].size + minReadedFileSize) < logicalPos {
-                let entry = entryList.removeFirst()
-                KSLog("[CacheIOContext] remove first entryLogicalPos:\(entry.logicalPos), logicalPos:\(logicalPos)")
-                newEntry = CacheEntry(logicalPos: urlPos, physicalPos: entry.physicalPos, size: 0, maxSize: entry.maxSize ?? entry.size)
-                size = min(size, Int32(entry.size))
-            } else if let last = entryList.last, last.logicalPos > urlPos {
+        } else if entryList.reduce(0, { result, entry in
+            // maxFileSize只算未观看的部分
+            result + (entry.logicalPos > logicalPos ? entry.size : 0)
+        }) > maxFileSize {
+            // 超出大小限制，那就看下是否有超前的片段可以用
+            if let last = entryList.last, last.logicalPos > urlPos {
                 let entry = entryList.removeLast()
                 newEntry = CacheEntry(logicalPos: urlPos, physicalPos: entry.physicalPos, size: 0, maxSize: entry.maxSize ?? entry.size)
                 size = min(size, Int32(entry.size))
@@ -77,7 +75,17 @@ public class LimitPreLoadIOContext: PreLoadIOContext {
                 return 0
             }
         } else {
-            newEntry = nil
+            // 看过的完整片段是否超出限制了。如果超出的话，那就重复使用
+            if entryList.reduce(0, { result, entry in
+                result + (entry.logicalPos <= logicalPos ? entry.size : 0)
+            }) > maxReadedFileSize {
+                let entry = entryList.removeFirst()
+                KSLog("[CacheIOContext] remove first entryLogicalPos:\(entry.logicalPos), logicalPos:\(logicalPos)")
+                newEntry = CacheEntry(logicalPos: urlPos, physicalPos: entry.physicalPos, size: 0, maxSize: entry.maxSize ?? entry.size)
+                size = min(size, Int32(entry.size))
+            } else {
+                newEntry = nil
+            }
         }
         let start = CACurrentMediaTime()
         let result = readComplete(buffer: loadMoreBuffer, size: size)
