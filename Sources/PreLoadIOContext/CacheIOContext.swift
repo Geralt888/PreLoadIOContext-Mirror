@@ -369,7 +369,8 @@ public class URLContextDownload: DownloadProtocol {
         } else {
             keepAlive = false
         }
-        let result = ffurl_open_whitelist(&context, url.absoluteString, flags, &interruptCB, options, nil, nil, nil)
+
+        let result = ffurl_open_whitelist(&context, url.ffmpegString, flags, &interruptCB, options, nil, nil, nil)
 
         //        ffurl_alloc(&context, url.absoluteString, AVIO_FLAG_READ, nil)
         //        ffurl_connect(context, options)
