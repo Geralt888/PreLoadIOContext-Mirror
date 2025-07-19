@@ -251,7 +251,10 @@ public class CacheIOContext: AbstractAVIOContext {
                 /// 有的直播回放ts流,在一开始播放的时候，会重复播放前面10s。
                 /// 看了下好像是因为在得到文件总大小之前缓存的数据是有问题的。
                 /// 所以这边先把之前的数据给清空了。
-                entryList.removeAll()
+                /// 如果是保存硬盘缓存的话，那就不用清空了。不然上次缓存的就没有用了。
+                if !saveFile {
+                    entryList.removeAll()
+                }
             }
         }
         // ogg直播流第一次需要返回-1才可以进行播放。
@@ -354,7 +357,7 @@ extension CacheIOContext: PlayList {
 }
 
 public class URLContextDownload: DownloadProtocol {
-    var context: UnsafeMutablePointer<URLContext>? = nil
+    var context: UnsafeMutablePointer<URLContext>?
     private let keepAlive: Bool
     public convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
         var avOptions = formatContextOptions.avOptions
