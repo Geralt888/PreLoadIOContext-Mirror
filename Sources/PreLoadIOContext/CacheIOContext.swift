@@ -137,6 +137,7 @@ public class CacheIOContext: AbstractAVIOContext {
             eof = true
         }
         if result <= 0 {
+            // 如果没有网络的话，会报错swift_AVERROR_EOF -541478725
             KSLog("[CacheIOContext] ffurl_read2 fail code:\(result) message: \(String(avErrorCode: result)) urlPos: \(urlPos)")
             return result
         }
@@ -326,16 +327,20 @@ public class CacheIOContext: AbstractAVIOContext {
         }
     }
 
-    override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
-        // url一样的话也不要进行复用。每次都要new一个新的。
-        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.sortQueryString.md5(), bufferSize: bufferSize, saveFile: saveFile) {
-            subIOContexts.append(subIOContext)
-            subIOContext.isJudgeEOF = false
-            return download.getURLContext(ioContext: self)
-        } else {
-            return nil
-        }
+    override public func nextAVOptions() -> UnsafeMutableRawPointer? {
+        (download as? AbstractAVIOContext)?.nextAVOptions()
     }
+
+//    override open func addSub(url: URL, flags: Int32, options: UnsafeMutablePointer<OpaquePointer?>?, interrupt: AVIOInterruptCB) -> UnsafeMutablePointer<AVIOContext>? {
+//        // url一样的话也不要进行复用。每次都要new一个新的。
+//        if let download = try? URLContextDownload(url: url, flags: flags, options: options, interrupt: interrupt), let subIOContext = try? Self(download: download, md5: url.sortQueryString.md5(), bufferSize: bufferSize, saveFile: saveFile) {
+//            subIOContexts.append(subIOContext)
+//            subIOContext.isJudgeEOF = false
+//            return download.getURLContext(ioContext: self)
+//        } else {
+//            return nil
+//        }
+//    }
 }
 
 extension CacheIOContext: PlayList {
@@ -356,7 +361,7 @@ extension CacheIOContext: PlayList {
     }
 }
 
-public class URLContextDownload: DownloadProtocol {
+public class URLContextDownload: AbstractAVIOContext {
     var context: UnsafeMutablePointer<URLContext>?
     private let keepAlive: Bool
     public convenience init(url: URL, formatContextOptions: [String: Any], interrupt: AVIOInterruptCB) throws {
@@ -382,29 +387,33 @@ public class URLContextDownload: DownloadProtocol {
         }
     }
 
-    public func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
+    override public func read(buffer: UnsafeMutablePointer<UInt8>?, size: Int32) -> Int32 {
         guard let context else {
             return swift_AVERROR_EOF
         }
         return ffurl_read2(context, buffer, size)
     }
 
-    public func seek(offset: Int64, whence: Int32) -> Int64 {
+    override public func seek(offset: Int64, whence: Int32) -> Int64 {
         guard let context else {
             return -1
         }
         return ffurl_seek2(context, offset, whence)
     }
 
-    public func fileSize() -> Int64 {
+    override public func fileSize() -> Int64 {
         guard let context else {
             return -1
         }
         return seek(offset: 0, whence: AVSEEK_SIZE)
     }
 
-    public func close() {
+    override public func close() {
         ffurl_closep(&context)
+    }
+
+    override public func nextAVOptions() -> UnsafeMutableRawPointer? {
+        UnsafeMutableRawPointer(context)
     }
 
     func getURLContext(ioContext: AbstractAVIOContext) -> UnsafeMutablePointer<AVIOContext>? {
